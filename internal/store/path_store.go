@@ -47,16 +47,15 @@ func (s *Store) GetPath(id string) (*model.ContamPath, error) {
 	return &p, nil
 }
 
-var pathListScratch []*model.ContamPath
-
 // ListPathsByChain 列出某链全部污染路径（按可疑度降序）。
+// 每次返回全新的独立切片与结构体副本，调用方可安全修改。
 func (s *Store) ListPathsByChain(chainID string) ([]*model.ContamPath, error) {
 	rows, err := s.db.Query(`SELECT id,chain_id,taxon,via_blank_id,via_batch_id,status,score,evidence,created_at,updated_at FROM contam_paths WHERE chain_id=? ORDER BY score DESC, taxon`, chainID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var out []*model.ContamPath
+	out := make([]*model.ContamPath, 0)
 	for rows.Next() {
 		var p model.ContamPath
 		var crAt, upAt string
@@ -72,15 +71,7 @@ func (s *Store) ListPathsByChain(chainID string) ([]*model.ContamPath, error) {
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	if cap(pathListScratch) >= len(out) {
-		pathListScratch = pathListScratch[:len(out)]
-		for i := range out {
-			pathListScratch[i] = out[i]
-		}
-		return pathListScratch, nil
-	}
-	pathListScratch = out
-	return pathListScratch, nil
+	return out, nil
 }
 
 // UpdatePathStatus 更新污染路径状态与证据。
