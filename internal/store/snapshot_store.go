@@ -79,11 +79,16 @@ func (s *Store) SetSnapshotPayload(id string, payload string) error {
 }
 
 // PublishSnapshot 发布快照（将旧快照置为替代，本快照置为发布并固定阈值）。
+// 失败路径必须 rollback 事务：本进程用单连接串行化写入（SetMaxOpenConns(1)），
+// 未回滚的事务会占住唯一连接，导致后续写入卡住或报 database locked。
 func (s *Store) PublishSnapshot(id string, threshold float64) error {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return err
 	}
+	// 任一失败路径都回滚，避免事务悬挂锁住连接。Commit 成功后 Rollback 为空操作。
+	defer func() { _ = tx.Rollback() }()
+
 	var chainID string
 	if err := tx.QueryRow(`SELECT chain_id FROM snapshots WHERE id=?`, id).Scan(&chainID); err != nil {
 		if err == sql.ErrNoRows {
@@ -98,5 +103,10 @@ func (s *Store) PublishSnapshot(id string, threshold float64) error {
 		string(model.SnapPublished), threshold, fmtTime(time.Now()), id); err != nil {
 		return err
 	}
-	return tx.Commit()
+
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	// Commit 成功，标记事务已结束，使 defer 的 Rollback 成为确定的空操作。
+	return nil
 }
