@@ -95,7 +95,7 @@ func (svc *Service) Seal(chainID string) error {
 
 func (svc *Service) transition(c *model.Chain, next model.ChainStatus) error {
 	if c.Status == model.ChainSealed {
-		return fmt.Errorf("transition blocked: %v", model.ErrSealedImmutable)
+		return fmt.Errorf("transition blocked: %w", model.ErrSealedImmutable)
 	}
 	ok := false
 	for _, t := range allowedTransitions[c.Status] {

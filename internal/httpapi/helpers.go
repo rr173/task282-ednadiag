@@ -3,6 +3,7 @@ package httpapi
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"task282-ednadiag/internal/model"
@@ -30,6 +31,9 @@ func notFound(w http.ResponseWriter, err error) { writeError(w, http.StatusNotFo
 // internalErr 写 500。
 func internalErr(w http.ResponseWriter, err error) { writeError(w, http.StatusInternalServerError, err) }
 
+// conflict 写 409（冲突：封存不可变、非法状态迁移等）。
+func conflict(w http.ResponseWriter, err error) { writeError(w, http.StatusConflict, err) }
+
 // readJSON 解析请求体到 v。
 func readJSON(r *http.Request, v any) error {
 	defer r.Body.Close()
@@ -43,9 +47,12 @@ func handleErr(w http.ResponseWriter, err error) {
 		notFound(w, err)
 		return
 	}
-	switch err {
-	case model.ErrInvalidInput, model.ErrBatchMissing, model.ErrFeatureCodeInvalid,
-		model.ErrChainCycle, model.ErrEmptyChain, model.ErrDuplicateID:
+	switch {
+	case errors.Is(err, model.ErrSealedImmutable) || errors.Is(err, model.ErrIllegalTransition):
+		conflict(w, err)
+	case errors.Is(err, model.ErrInvalidInput) || errors.Is(err, model.ErrBatchMissing) ||
+		errors.Is(err, model.ErrFeatureCodeInvalid) || errors.Is(err, model.ErrChainCycle) ||
+		errors.Is(err, model.ErrEmptyChain) || errors.Is(err, model.ErrDuplicateID):
 		badRequest(w, err)
 	default:
 		internalErr(w, err)
