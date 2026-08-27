@@ -9,7 +9,7 @@ import (
 
 func (h *Handlers) listPaths(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	paths, err := h.app.Store.ListPathsByChain(id)
+	paths, err := h.app.ListPaths(id)
 	if err != nil {
 		handleErr(w, err)
 		return

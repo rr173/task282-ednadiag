@@ -5,6 +5,7 @@ package store
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -17,13 +18,23 @@ type Store struct {
 
 // Open 打开（必要时创建）SQLite 数据库并完成迁移。
 func Open(path string) (*Store, error) {
-	db, err := sql.Open("sqlite", path)
+	// 通过 DSN pragma 配置并发行为：
+	//   busy_timeout(5000)：写竞争时等待最多 5s 再放弃，避免 SQLITE_BUSY 直接报错；
+	//   journal_mode(WAL)：写不阻塞读，多读者并发读不互相加锁；
+	//   foreign_keys(ON)：外键约束始终生效。
+	dsn := path
+	if i := strings.IndexByte(dsn, '?'); i >= 0 {
+		dsn = dsn[:i]
+	}
+	dsn += "?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(ON)"
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite %q: %w", path, err)
 	}
-	// 单连接串行化写入，避免并发写竞争（现代 cgo-free sqlite 后端更稳）。
-	db.SetMaxOpenConns(32)
-	db.SetMaxIdleConns(32)
+	// 限制连接数：同一数据库的多连接写仍会经 busy_timeout 串行化，
+	// 但保留若干连接以支撑并发读（WAL 下读不阻塞写）。
+	db.SetMaxOpenConns(8)
+	db.SetMaxIdleConns(8)
 	if err := db.Ping(); err != nil {
 		return nil, fmt.Errorf("ping sqlite: %w", err)
 	}

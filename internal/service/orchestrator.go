@@ -7,7 +7,16 @@ import (
 )
 
 // RunTraceCtx 对实验链执行完整追溯，并在各阶段检查 ctx 取消。
+// 同一链的追溯串行执行（持有 chainMu），避免并发 DeletePathsByChain/CreatePath
+// 互相清空，以及读端在“删除后、重建前”窗口看到空列表或条数漂移。
 func (a *App) RunTraceCtx(ctx context.Context, chainID string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	mu := a.chainMu(chainID)
+	mu.Lock()
+	defer mu.Unlock()
+	// 取锁后再校验一次 ctx，避免在已取消的请求上空跑完整追溯。
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -65,6 +74,23 @@ func (a *App) IsolateBatch(chainID, batchID string) ([]*model.ContamPath, error)
 	mu.Lock()
 	defer mu.Unlock()
 	return a.Diag.IsolateBatch(chainID, batchID)
+}
+
+// ListPaths 返回某链的全部污染路径。持有同链串行锁，确保读取与并发追溯互斥：
+// 不会落在 DeletePathsByChain 之后、CreatePath 之前的空窗期，因此列表稳定且非空
+// （只要追溯已落定）。链不存在时返回 ErrNotFound。
+func (a *App) ListPaths(chainID string) ([]*model.ContamPath, error) {
+	exists, err := a.Store.ChainExists(chainID)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, model.ErrNotFound
+	}
+	mu := a.chainMu(chainID)
+	mu.Lock()
+	defer mu.Unlock()
+	return a.Store.ListPathsByChain(chainID)
 }
 
 // CreateSnapshot 为实验链创建草稿可信度快照。
