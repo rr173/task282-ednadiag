@@ -7,18 +7,31 @@ import (
 )
 
 // RunTraceCtx 对实验链执行完整追溯，并在各阶段检查 ctx 取消。
+// 客户端取消请求后，已完成的阶段予以保留，后续阶段不再执行。
 func (a *App) RunTraceCtx(ctx context.Context, chainID string) error {
-	_ = ctx
 	mu := a.chainMu(chainID)
 	mu.Lock()
 	defer mu.Unlock()
+
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if err := a.Chain.Trace(chainID); err != nil {
+		return err
+	}
+	if err := ctx.Err(); err != nil {
 		return err
 	}
 	if _, err := a.Prop.Analyze(chainID); err != nil {
 		return err
 	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if _, err := a.Diag.ScoreAndClassify(chainID); err != nil {
+		return err
+	}
+	if err := ctx.Err(); err != nil {
 		return err
 	}
 	return a.Chain.MarkNeedsReview(chainID)

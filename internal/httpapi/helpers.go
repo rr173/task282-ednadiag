@@ -2,12 +2,17 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 
 	"task282-ednadiag/internal/model"
 )
+
+// statusClientClosedRequest 表示客户端在响应写入前关闭了连接
+// （沿用 nginx 的 499 约定），用于与 5xx 服务端错误区分。
+const statusClientClosedRequest = 499
 
 // writeJSON 写 JSON 响应。
 func writeJSON(w http.ResponseWriter, code int, v any) {
@@ -40,6 +45,11 @@ func readJSON(r *http.Request, v any) error {
 
 // handleErr 根据错误类型映射状态码。
 func handleErr(w http.ResponseWriter, err error) {
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		// 客户端取消或请求超时：不按服务端 5xx 处理。
+		writeError(w, statusClientClosedRequest, err)
+		return
+	}
 	if model.IsNotFound(err) {
 		notFound(w, err)
 		return
