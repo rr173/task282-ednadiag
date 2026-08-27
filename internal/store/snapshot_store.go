@@ -71,12 +71,6 @@ func (s *Store) ListSnapshots(chainID string) ([]*model.Snapshot, error) {
 	return out, rows.Err()
 }
 
-// SetSnapshotPayload 写入快照载荷。
-func (s *Store) SetSnapshotPayload(id string, payload string) error {
-	_, err := s.db.Exec(`UPDATE snapshots SET payload=? WHERE id=?`, payload, id)
-	return err
-}
-
 // PublishSnapshot 发布快照（将旧快照置为替代，本快照置为发布并固定阈值）。
 func (s *Store) PublishSnapshot(id string, threshold float64) error {
 	tx, err := s.db.Begin()

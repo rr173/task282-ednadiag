@@ -105,20 +105,11 @@ func (svc *Service) CreateDraft(chainID string, threshold float64) (*model.Snaps
 }
 
 // Publish 发布快照（将同链旧快照置为替代，固化阈值）。
+// 发布只固化 CreateDraft 时计算的草稿载荷，绝不按 live 路径重建：
+// 否则发布后否决某路径再发布同快照，已发布快照里的分类单元条目会跟着变，
+// 破坏快照不可变性。
 func (svc *Service) Publish(snapshotID string, threshold float64) (*model.Snapshot, error) {
-	snap, err := svc.store.GetSnapshot(snapshotID)
-	if err != nil {
-		return nil, err
-	}
-	payload, err := svc.BuildPayload(snap.ChainID)
-	if err != nil {
-		return nil, err
-	}
-	b, err := json.Marshal(payload)
-	if err != nil {
-		return nil, err
-	}
-	if err := svc.store.SetSnapshotPayload(snapshotID, string(b)); err != nil {
+	if _, err := svc.store.GetSnapshot(snapshotID); err != nil {
 		return nil, err
 	}
 	if err := svc.store.PublishSnapshot(snapshotID, threshold); err != nil {
