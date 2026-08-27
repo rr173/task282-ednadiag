@@ -2,7 +2,6 @@
 package chain
 
 import (
-	"fmt"
 	"time"
 
 	"task282-ednadiag/internal/model"
@@ -61,7 +60,7 @@ func (svc *Service) AddStep(chainID, entityID, entityType string) error {
 func (svc *Service) Trace(chainID string) error {
 	c, err := svc.store.GetChain(chainID)
 	if err != nil {
-		return fmt.Errorf("chain trace: %v", err)
+		return err
 	}
 	return svc.transition(c, model.ChainTracePending)
 }

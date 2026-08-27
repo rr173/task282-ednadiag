@@ -3,6 +3,7 @@ package httpapi
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"task282-ednadiag/internal/model"
@@ -38,14 +39,20 @@ func readJSON(r *http.Request, v any) error {
 }
 
 // handleErr 根据错误类型映射状态码。
+// 使用 errors.Is 而非 == 比较，使被 fmt.Errorf("%w") 包装的领域错误仍能正确映射。
 func handleErr(w http.ResponseWriter, err error) {
-	switch err {
-	case model.ErrNotFound:
+	switch {
+	case errors.Is(err, model.ErrNotFound):
 		notFound(w, err)
-	case model.ErrInvalidInput, model.ErrBatchMissing, model.ErrFeatureCodeInvalid,
-		model.ErrChainCycle, model.ErrEmptyChain, model.ErrDuplicateID:
+	case errors.Is(err, model.ErrInvalidInput) ||
+		errors.Is(err, model.ErrBatchMissing) ||
+		errors.Is(err, model.ErrFeatureCodeInvalid) ||
+		errors.Is(err, model.ErrChainCycle) ||
+		errors.Is(err, model.ErrEmptyChain) ||
+		errors.Is(err, model.ErrDuplicateID):
 		badRequest(w, err)
-	case model.ErrSealedImmutable, model.ErrIllegalTransition:
+	case errors.Is(err, model.ErrSealedImmutable) ||
+		errors.Is(err, model.ErrIllegalTransition):
 		writeError(w, http.StatusConflict, err)
 	default:
 		internalErr(w, err)
