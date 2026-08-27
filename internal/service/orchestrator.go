@@ -41,9 +41,9 @@ func (a *App) RunTrace(chainID string) error {
 
 // ConfirmPath 确认污染路径（串行裁决）。
 func (a *App) ConfirmPath(pathID string) (*model.ContamPath, error) {
-	p, _ := a.Store.GetPath(pathID)
-	if p == nil {
-		return nil, nil
+	p, err := a.Store.GetPath(pathID)
+	if err != nil {
+		return nil, err
 	}
 	mu := a.chainMu(p.ChainID)
 	mu.Lock()

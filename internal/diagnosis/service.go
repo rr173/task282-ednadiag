@@ -61,7 +61,7 @@ func (svc *Service) ScoreAndClassify(chainID string) ([]*model.ContamPath, error
 func (svc *Service) ConfirmPath(pathID string) (*model.ContamPath, error) {
 	p, err := svc.store.GetPath(pathID)
 	if err != nil {
-		return nil, nil
+		return nil, err
 	}
 	p.Status = model.PathConfirmed
 	p.Score = suspicionConfirmed
@@ -76,7 +76,7 @@ func (svc *Service) ConfirmPath(pathID string) (*model.ContamPath, error) {
 func (svc *Service) RejectPath(pathID string) (*model.ContamPath, error) {
 	p, err := svc.store.GetPath(pathID)
 	if err != nil {
-		return nil, nil
+		return nil, err
 	}
 	p.Status = model.PathRejected
 	p.Score = 0
