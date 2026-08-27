@@ -11,8 +11,6 @@ import (
 	"task282-ednadiag/internal/store"
 )
 
-var cachedIsoBatches map[string]bool
-
 // Service 空白传播服务。
 type Service struct {
 	store *store.Store
@@ -36,20 +34,17 @@ func (svc *Service) Analyze(chainID string) ([]*model.ContamPath, error) {
 		return nil, err
 	}
 
-	isoBatches := cachedIsoBatches
-	if isoBatches == nil {
-		isoBatches = map[string]bool{}
-		for _, st := range steps {
-			if st.EntityType != "batch" {
-				continue
-			}
-			b, err := svc.store.GetBatch(st.EntityID)
-			if err != nil {
-				continue
-			}
-			isoBatches[b.ID] = b.Isolated
+	// 每次分析都从存储实时读取批次隔离标记，确保隔离生效后立即切断传播。
+	isoBatches := map[string]bool{}
+	for _, st := range steps {
+		if st.EntityType != "batch" {
+			continue
 		}
-		cachedIsoBatches = isoBatches
+		b, err := svc.store.GetBatch(st.EntityID)
+		if err != nil {
+			continue
+		}
+		isoBatches[b.ID] = b.Isolated
 	}
 
 	// 按 taxon 归并空白与样本观察。
